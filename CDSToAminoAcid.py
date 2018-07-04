@@ -73,8 +73,8 @@ fastatemp.close()
 print('Sequences written to {0}'.format(cl_args.output))
 
 if len(errorlog) > 0:
-	print('WARNING: Translation errors were encountered. See log file for details.')
-	print('Logfile location: '+os.path.dirname(cl_args.output)+'CDSToAminoAcid_logfile_'+time.strftime('%Y%m%d_%H%M')+'.txt')
 	with open(os.path.join(os.path.dirname(cl_args.output),'CDSToAminoAcid_logfile_'+time.strftime('%Y%m%d_%H%M')+'.txt'),'w') as logfile:
 		for entry in errorlog:
 			logfile.write(str(entry))
+	print('WARNING: Translation errors were encountered. See log file for details.')
+	print('Logfile location: '+os.path.dirname(cl_args.output)+os.sep+'CDSToAminoAcid_logfile_'+time.strftime('%Y%m%d_%H%M')+'.txt')
