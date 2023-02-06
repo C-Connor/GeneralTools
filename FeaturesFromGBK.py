@@ -1,7 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 from Bio import SeqIO
 import argparse
 import os
+import errno
 import sys
 import time
 
@@ -34,7 +35,7 @@ if cl_args.output != None:
     try:
         os.makedirs(os.path.abspath(os.path.dirname(cl_args.output)))
     except OSError as er:
-        if er.errno == os.errno.EEXIST:
+        if er.errno == errno.EEXIST:
             print('Output directory already exists.')
         else:
             raise
@@ -44,16 +45,16 @@ if cl_args.output == None:
 #extract CDS features and info, and write to file
 print('Extracting  features...')
 with open(cl_args.output,'w') as outhandle:
-    outhandle.write('Feature_type\tLocus_tag\tgene_name\tproduct\tdb_xref\tprotein_id\tstart\tend\n')
-    for record in SeqIO.parse(cl_args.gbkin,'genbank'):
-        for seqrecord in record.features:
+	outhandle.write('Feature_type\tLocus_tag\tgene_name\tproduct\tdb_xref\tprotein_id\tstart\tend\n')
+	for record in SeqIO.parse(cl_args.gbkin,'genbank'):
+		for seqrecord in record.features:
 			if seqrecord.type in set(feature_list):
 				try:
 					locus_tag = seqrecord.qualifiers.get('locus_tag')[0]
 				except TypeError:
 					locus_tag = seqrecord.qualifiers.get('locus_tag')
 				try:
-                			gene = seqrecord.qualifiers.get('gene')[0]
+					gene = seqrecord.qualifiers.get('gene')[0]
 				except TypeError:
 					gene = seqrecord.qualifiers.get('gene')
 				try:
