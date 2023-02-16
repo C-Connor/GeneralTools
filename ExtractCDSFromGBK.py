@@ -12,8 +12,8 @@ import pathlib
 
 #command line arguments
 cl_parser = argparse.ArgumentParser(
-    description="Extracts nucleotide or peptide sequences from CDS in GBK file.", 
-    epilog="Example command:  ExtractCDSFromGBK.py nucleotide -i in.gbk -o out.fasta -c CDSlist.txt"
+    description="Extracts nucleotide or peptide sequences from CDS in GBK file. Can provide list of select genes to extract, provide EITHER gene name, locus tags or protein IDs.", 
+    epilog="Example command:  ExtractCDSFromGBK.py nucleotide -i in.gbk -o out.fasta -l LocusTagList.txt"
     )
 cl_parser.add_argument("-i","--gbk_in", 
                        help="Genbank file to extract CDS sequences from",
@@ -24,9 +24,19 @@ cl_parser.add_argument("-o","--output",
 cl_parser.add_argument("SeqType",
                        help="Extract nucleotide or peptide sequences",
                        choices=['nucleotide','peptide'])
-cl_parser.add_argument("-c","--cds_list",
-                       help="Filepath, list of CDS to extract, one per line, use gene name e.g. thrL. Default is None which extracts all CDS.",
-                       dest='cds',type=str,default=None)
+
+group = cl_parser.add_mutually_exclusive_group()
+group.add_argument("-g","--gene_list",
+                       help="Filepath, list of CDS to extract, one per line, use GENE NAME e.g. 'thrL'. Default is None which extracts all CDS.",
+                       dest='gene',type=str,default=None,metavar="FILEPATH")
+group.add_argument("-l","--locus_list",
+                       help="Filepath, list of CDS to extract, one per line, use LOCUS TAG e.g. 'tag_001'. Default is None which extracts all CDS.",
+                       dest='locus_tag',type=str,default=None,metavar="FILEPATH")
+group.add_argument("-p","--protid_list",
+                       help="Filepath, list of CDS to extract, one per line, use PROTEIN ID e.g. 'AB1234.1'. Default is None which extracts all CDS.",
+                       dest='protein_id',type=str,default=None,metavar="FILEPATH")
+
+
 cl_args = cl_parser.parse_args()
 
 #check user output file exists or make directories if necessary
@@ -35,9 +45,19 @@ if cl_args.output.exists():
 if not cl_args.output.parent.exists():
     cl_args.output.parent.mkdir(parents=True,exist_ok=False)
 
+
+#check if CDS list has been provided and which format
+if any([vars(cl_args)[v] != None for v in ['gene','locus_tag','protein_id']]):
+    #cds set
+    for arg,val in vars(cl_args).items():
+        if val != None:
+            cds = (arg,val) #relies on mutually exclusive options
+else:
+    cds= None
+
 #read in selected CDS if set
-if cl_args.cds != None:
-    with open(cl_args.cds) as infile:
+if cds != None:
+    with open(cds[1]) as infile:
         select_cds = [line.strip() for line in infile]
 
 #read GBK file
@@ -50,10 +70,14 @@ def Pull(f):
         seq = Seq(f.qualifiers['translation'][0])
     else:
         seq = f.extract(genome.seq)
+    if cds != None:
+        name = f.qualifiers[cds[0]][0]
+    else:
+        name = f.qualifiers['protein_id'][0]
     return SeqRecord(
         seq,
-        id="|".join([f.qualifiers['protein_id'][0],f.qualifiers['gene'][0]]+f.qualifiers['db_xref']),
-        name=f.qualifiers['gene'][0],
+        id="|".join([y for x in [f.qualifiers[key] for key in f.qualifiers.keys() if key in set(['protein_id','gene','db_xref'])] for y in x]),
+        name=name, 
         description = f.qualifiers['product'][0]
     )
 
@@ -61,19 +85,20 @@ def Pull(f):
 seqs = []
 for f in genome.features:
     if (f.type == 'CDS') and ('protein_id' in f.qualifiers.keys()):
-        if cl_args.cds == None:
+        if cds == None:
             seqs.append(Pull(f))
         else:
-            if f.qualifiers['gene'][0] in select_cds:
+            if (cds[0] in f.qualifiers.keys()) and (f.qualifiers[cds[0]][0] in select_cds):
                 seqs.append(Pull(f))
 
 #check if all CDS have been found, list those that haven't
-if len(seqs) == 0:
-    print('ERROR: Specified CDS not found in GBK file')
-    sys.exit(1)
-elif len(seqs) < len(select_cds):
-    print(f"Not all Selected CDS specified in '{cl_args.cds}' were found in '{cl_args.gbkin}'")
-    print(f"CDS not found: {set(select_cds) - set(x.name for x in seqs)}")
+if cds != None:
+    if len(seqs) == 0:
+        print('ERROR: None of the specified CDS not found in GBK file.\nExiting.')
+        sys.exit(1)
+    elif len(seqs) < len(select_cds):
+        print(f"Not all Selected CDS specified in '{cds[1]}' were found in '{cl_args.gbkin}'")
+        print(f"Missing CDS: {set(select_cds) - set(x.name for x in seqs)}")
 
 #write found sequences to file in fasta format
 with open(cl_args.output,'w') as outfile:
